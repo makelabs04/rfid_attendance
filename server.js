@@ -25,11 +25,17 @@ app.use('/api/push',       require('./routes/push'));
 app.use('/rfid',           require('./routes/rfid'));  // Arduino endpoint
 
 // Serve HTML pages
-app.get('/',               (req, res) => res.sendFile(path.join(__dirname, 'public/pages/login.html')));
-app.get('/register',       (req, res) => res.sendFile(path.join(__dirname, 'public/pages/register.html')));
-app.get('/dashboard',      (req, res) => res.sendFile(path.join(__dirname, 'public/pages/user-dashboard.html')));
-app.get('/admin',          (req, res) => res.sendFile(path.join(__dirname, 'public/pages/admin-dashboard.html')));
+// /register goes to login.html — register tab is built into the same page
+app.get('/',          (req, res) => res.sendFile(path.join(__dirname, 'public/pages/login.html')));
+app.get('/register',  (req, res) => res.sendFile(path.join(__dirname, 'public/pages/login.html')));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public/pages/user-dashboard.html')));
+app.get('/admin',     (req, res) => res.sendFile(path.join(__dirname, 'public/pages/admin-dashboard.html')));
+
+// 404 fallback
+app.use((req, res) => {
+  res.status(404).send('Page not found. <a href="/">Go to Login</a>');
+});
 
 app.listen(PORT, () => {
-  console.log(`✅ RFID Attendance Server running on http://localhost:${PORT}`);
+  console.log(`✅ RFID Attendance Server running on port ${PORT}`);
 });
