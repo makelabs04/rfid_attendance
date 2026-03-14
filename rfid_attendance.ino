@@ -45,7 +45,7 @@
 // ── WiFi & Server Config ───────────────────────────────────
 const char* WIFI_SSID     = "YOUR_WIFI_SSID";
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
-const char* SERVER_URL    = "http://192.168.1.100:3000/rfid/scan"; // Your Node.js server IP:PORT
+const char* SERVER_URL    = "https://rfid.makelearners.com/rfid/scan"; // Your Node.js server IP:PORT
 
 // ── Globals ────────────────────────────────────────────────
 MFRC522 rfid(SS_PIN, RST_PIN);
