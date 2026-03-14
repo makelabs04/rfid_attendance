@@ -10,10 +10,10 @@ const moment    = require('moment-timezone');
 
 // ── DB config ───────────────────────────────────────────────
 const DB = {
-  host:     'localhost',
-  user:     'root',
-  password: 'your_db_password',
-  database: 'rfid_attendance',
+  host:     '127.0.0.1',
+  user:     'u966260443_rfidNode',
+  password: 'Makelabs@123',
+  database: 'u966260443_rfidNode',
   waitForConnections: true,
   connectionLimit: 10
 };
