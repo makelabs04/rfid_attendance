@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Attendance Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0f1e; --surface:#111827; --card:#1a2235; --border:#2a3a55;
+    --accent:#3b82f6; --accent2:#06b6d4; --green:#10b981; --red:#ef4444;
+    --yellow:#f59e0b; --purple:#8b5cf6; --text:#f0f4ff; --muted:#8899bb;
+    --radius:14px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'Space Grotesk',sans-serif; min-height:100vh; }
+
+  /* TOPBAR */
+  .topbar {
+    background:var(--card); border-bottom:1px solid var(--border);
+    padding:0 24px; height:60px;
+    display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:100;
+  }
+  .topbar-left { display:flex; align-items:center; gap:12px; }
+  .logo-icon { width:36px; height:36px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:16px; }
+  .topbar-right { display:flex; align-items:center; gap:12px; }
+  .user-chip { display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); padding:6px 12px; border-radius:20px; font-size:13px; }
+  .user-avatar { width:26px; height:26px; background:linear-gradient(135deg,var(--accent),var(--purple)); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; }
+  .btn-sm { padding:7px 14px; border:1px solid var(--border); background:transparent; color:var(--muted); border-radius:8px; font-family:inherit; font-size:12px; cursor:pointer; transition:all 0.2s; }
+  .btn-sm:hover { border-color:var(--accent); color:var(--text); }
+  .btn-notif { background:rgba(59,130,246,0.15); border-color:var(--accent); color:var(--accent); }
+  .btn-notif.active { background:var(--accent); color:white; }
+
+  /* LAYOUT */
+  .main { padding:24px; max-width:1200px; margin:0 auto; display:grid; grid-template-columns:1fr 320px; gap:20px; }
+
+  /* STAT CARDS */
+  .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; grid-column:1/-1; }
+  .stat-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; }
+  .stat-card .label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); margin-bottom:8px; }
+  .stat-card .value { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; }
+  .stat-card.present .value  { color:var(--green); }
+  .stat-card.late    .value  { color:var(--yellow); }
+  .stat-card.absent  .value  { color:var(--red); }
+  .stat-card.hours   .value  { color:var(--accent2); }
+  .stat-card .sub { font-size:11px; color:var(--muted); margin-top:4px; }
+
+  /* CALENDAR */
+  .section-title { font-family:'Syne',sans-serif; font-size:16px; font-weight:800; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; }
+  .calendar-nav { display:flex; align-items:center; gap:10px; font-size:14px; }
+  .nav-btn { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:4px 10px; border-radius:7px; cursor:pointer; font-family:inherit; }
+  .nav-btn:hover { border-color:var(--accent); }
+
+  .calendar-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+  .cal-header { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:8px; }
+  .cal-header span { text-align:center; font-size:11px; font-weight:700; text-transform:uppercase; color:var(--muted); padding:4px; }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .cal-day {
+    aspect-ratio:1; border-radius:8px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:12px; font-weight:600; cursor:default;
+    border:1px solid transparent; transition:all 0.15s;
+    position:relative;
+  }
+  .cal-day:hover { border-color:var(--border); }
+  .cal-day .day-num { font-size:13px; font-weight:700; }
+  .cal-day .day-dot { width:5px; height:5px; border-radius:50%; margin-top:2px; }
+  .cal-day.present  { background:rgba(16,185,129,0.12); color:var(--green); }
+  .cal-day.present .day-dot { background:var(--green); }
+  .cal-day.late     { background:rgba(245,158,11,0.12); color:var(--yellow); }
+  .cal-day.late .day-dot { background:var(--yellow); }
+  .cal-day.absent   { background:rgba(239,68,68,0.1); color:var(--red); }
+  .cal-day.absent .day-dot { background:var(--red); }
+  .cal-day.early_leave { background:rgba(139,92,246,0.12); color:var(--purple); }
+  .cal-day.early_leave .day-dot { background:var(--purple); }
+  .cal-day.weekend  { background:rgba(255,255,255,0.03); color:var(--muted); }
+  .cal-day.today    { border-color:var(--accent) !important; box-shadow:0 0 0 1px var(--accent); }
+  .cal-day.empty    { background:transparent; border-color:transparent; }
+
+  /* LEGEND */
+  .legend { display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; }
+  .legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
+  .legend-dot { width:8px; height:8px; border-radius:50%; }
+
+  /* TOOLTIP */
+  .cal-day[data-tip]:hover::after {
+    content:attr(data-tip);
+    position:absolute; bottom:110%; left:50%; transform:translateX(-50%);
+    background:var(--surface); border:1px solid var(--border);
+    padding:6px 10px; border-radius:7px; font-size:11px; white-space:nowrap;
+    color:var(--text); z-index:10; pointer-events:none;
+  }
+
+  /* RIGHT SIDEBAR */
+  .sidebar { display:flex; flex-direction:column; gap:16px; }
+
+  /* TODAY CARD */
+  .today-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+  .status-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-bottom:12px; }
+  .status-badge.present  { background:rgba(16,185,129,0.15); color:var(--green); }
+  .status-badge.late     { background:rgba(245,158,11,0.15);  color:var(--yellow); }
+  .status-badge.absent   { background:rgba(239,68,68,0.15);   color:var(--red); }
+  .status-badge.checked-out { background:rgba(139,92,246,0.15); color:var(--purple); }
+  .time-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); }
+  .time-row:last-child { border-bottom:none; }
+  .time-row .t-label { font-size:12px; color:var(--muted); }
+  .time-row .t-value { font-size:14px; font-weight:700; font-variant-numeric:tabular-nums; }
+
+  /* MESSAGES */
+  .messages-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; flex:1; }
+  .msg-item { padding:12px 0; border-bottom:1px solid var(--border); }
+  .msg-item:last-child { border-bottom:none; }
+  .msg-from { font-size:11px; color:var(--muted); margin-bottom:3px; }
+  .msg-subject { font-size:13px; font-weight:600; margin-bottom:4px; }
+  .msg-body { font-size:12px; color:var(--muted); line-height:1.4; }
+  .msg-time { font-size:10px; color:var(--border); margin-top:4px; }
+  .empty-state { text-align:center; padding:30px 0; color:var(--muted); font-size:13px; }
+
+  @media(max-width:900px) {
+    .main { grid-template-columns:1fr; }
+    .stats-row { grid-template-columns:repeat(2,1fr); }
+    .sidebar { grid-row:2; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo-icon">📡</div>
+    <span class="logo-text">RFID Attendance</span>
+  </div>
+  <div class="topbar-right">
+    <button class="btn-sm btn-notif" id="notifBtn" onclick="toggleNotifications()">🔔 Enable Alerts</button>
+    <div class="user-chip">
+      <div class="user-avatar" id="userInitials">?</div>
+      <span id="userName">Loading...</span>
+    </div>
+    <button class="btn-sm" onclick="logout()">Sign Out</button>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Stats Row -->
+  <div class="stats-row">
+    <div class="stat-card present">
+      <div class="label">Present Days</div>
+      <div class="value" id="statPresent">—</div>
+      <div class="sub" id="statMonth">This Month</div>
+    </div>
+    <div class="stat-card late">
+      <div class="label">Late Days</div>
+      <div class="value" id="statLate">—</div>
+      <div class="sub">Arrived late</div>
+    </div>
+    <div class="stat-card absent">
+      <div class="label">Absent Days</div>
+      <div class="value" id="statAbsent">—</div>
+      <div class="sub">Not attended</div>
+    </div>
+    <div class="stat-card hours">
+      <div class="label">Working Hours</div>
+      <div class="value" id="statHours">—</div>
+      <div class="sub">Total this month</div>
+    </div>
+  </div>
+
+  <!-- Calendar Section -->
+  <div>
+    <div class="section-title">
+      <span>Attendance Calendar</span>
+      <div class="calendar-nav">
+        <button class="nav-btn" onclick="changeMonth(-1)">‹</button>
+        <span id="calMonthLabel">Loading...</span>
+        <button class="nav-btn" onclick="changeMonth(1)">›</button>
+      </div>
+    </div>
+    <div class="calendar-card">
+      <div class="cal-header">
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+      </div>
+      <div class="cal-grid" id="calGrid">
+        <div class="empty-state">Loading calendar...</div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Present</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>Late</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Absent</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>Early Leave</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--muted)"></div>Weekend</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <!-- Today -->
+    <div class="today-card">
+      <div class="section-title" style="margin-bottom:12px">Today</div>
+      <div id="todayContent">
+        <div class="empty-state" style="padding:16px 0">Scan your RFID card to check in</div>
+      </div>
+    </div>
+    <!-- Messages -->
+    <div class="messages-card">
+      <div class="section-title" style="margin-bottom:12px">Messages from Admin</div>
+      <div id="messagesList"><div class="empty-state">No messages</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentMonth = new Date().toISOString().slice(0,7);
+let notifEnabled = false;
+
+// ── Init ──────────────────────────────────────────────────
+async function init() {
+  const res = await fetch('/api/auth/me');
+  const data = await res.json();
+  if (!data.loggedIn || data.user.role !== 'user') { window.location.href='/'; return; }
+  const u = data.user;
+  document.getElementById('userName').textContent = u.name;
+  document.getElementById('userInitials').textContent = u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  loadCalendar();
+  loadToday();
+  loadMessages();
+  checkNotifStatus();
+}
+
+async function loadCalendar() {
+  const res = await fetch(`/api/user/monthly?month=${currentMonth}`);
+  const data = await res.json();
+  if (!data.success) return;
+
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const [y, m] = currentMonth.split('-').map(Number);
+  document.getElementById('calMonthLabel').textContent = `${months[m-1]} ${y}`;
+
+  // Update stats
+  document.getElementById('statPresent').textContent = data.summary.present;
+  document.getElementById('statLate').textContent = data.summary.late;
+  document.getElementById('statAbsent').textContent = data.summary.absent;
+  document.getElementById('statHours').textContent = data.summary.total_hours + 'h';
+  document.getElementById('statMonth').textContent = `${months[m-1]} ${y}`;
+
+  // Build calendar grid
+  const firstDay = new Date(y, m-1, 1).getDay();
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  const today = new Date().toISOString().split('T')[0];
+
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+
+  data.calendar.forEach(day => {
+    const el = document.createElement('div');
+    el.className = `cal-day ${day.status}`;
+    if (day.date === today) el.classList.add('today');
+
+    let tip = '';
+    if (day.check_in) tip += `In: ${fmtTime(day.check_in)}`;
+    if (day.check_out) tip += ` | Out: ${fmtTime(day.check_out)}`;
+    if (day.working_hours > 0) tip += ` | ${day.working_hours}h`;
+    if (tip) el.setAttribute('data-tip', tip);
+
+    el.innerHTML = `<div class="day-num">${parseInt(day.date.split('-')[2])}</div><div class="day-dot"></div>`;
+    grid.appendChild(el);
+  });
+}
+
+async function loadToday() {
+  const res = await fetch('/api/user/today');
+  const data = await res.json();
+  if (!data.success) return;
+  const cont = document.getElementById('todayContent');
+  if (!data.records.length) { cont.innerHTML = '<div class="empty-state" style="padding:16px 0">Scan your RFID card to check in</div>'; return; }
+
+  const checkIn  = data.records.find(r => r.scan_type === 'check_in');
+  const checkOut = data.records.find(r => r.scan_type === 'check_out');
+  const status   = checkOut ? 'checked-out' : (checkIn ? checkIn.status : 'absent');
+  const label    = { present:'✅ Present', late:'⚠️ Late', early_leave:'🏃 Early Leave', 'checked-out':'✔ Checked Out', absent:'❌ Absent' }[status] || status;
+
+  cont.innerHTML = `
+    <div class="status-badge ${status}">${label}</div>
+    <div class="time-row"><span class="t-label">Check In</span><span class="t-value">${checkIn ? fmtTime(checkIn.scan_time) : '—'}</span></div>
+    <div class="time-row"><span class="t-label">Check Out</span><span class="t-value">${checkOut ? fmtTime(checkOut.scan_time) : '—'}</span></div>
+    <div class="time-row"><span class="t-label">Working Hours</span><span class="t-value">${checkIn?.working_hours || checkOut?.working_hours || '—'}${(checkIn?.working_hours || checkOut?.working_hours) ? 'h' : ''}</span></div>
+  `;
+}
+
+async function loadMessages() {
+  const res = await fetch('/api/user/messages');
+  const data = await res.json();
+  const list = document.getElementById('messagesList');
+  if (!data.success || !data.messages.length) { list.innerHTML = '<div class="empty-state">No messages</div>'; return; }
+  list.innerHTML = data.messages.map(m => `
+    <div class="msg-item">
+      <div class="msg-from">From: ${m.from_name}</div>
+      <div class="msg-subject">${m.subject}</div>
+      <div class="msg-body">${m.body}</div>
+      <div class="msg-time">${new Date(m.sent_at).toLocaleString()}</div>
+    </div>
+  `).join('');
+}
+
+function changeMonth(dir) {
+  const [y, m] = currentMonth.split('-').map(Number);
+  const d = new Date(y, m - 1 + dir, 1);
+  currentMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  loadCalendar();
+}
+
+function fmtTime(dt) {
+  if (!dt) return '—';
+  return new Date(dt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+// ── Push Notifications ────────────────────────────────────
+function checkNotifStatus() {
+  if (Notification.permission === 'granted') {
+    notifEnabled = true;
+    const btn = document.getElementById('notifBtn');
+    btn.textContent = '🔔 Alerts On';
+    btn.classList.add('active');
+  }
+}
+
+async function toggleNotifications() {
+  if (notifEnabled) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert('Push notifications not supported in this browser');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { alert('Notification permission denied'); return; }
+
+  // Get VAPID key and subscribe
+  const keyRes = await fetch('/api/push/vapid-key');
+  const { publicKey } = await keyRes.json();
+
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
+
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey)
+  });
+
+  await fetch('/api/push/subscribe', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ subscription: sub })
+  });
+
+  notifEnabled = true;
+  const btn = document.getElementById('notifBtn');
+  btn.textContent = '🔔 Alerts On';
+  btn.classList.add('active');
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData = window.atob(base64);
+  return new Uint8Array([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function logout() {
+  await fetch('/api/auth/logout', {method:'POST'});
+  window.location.href = '/';
+}
+
+init();
+// Refresh today status every 60s
+setInterval(loadToday, 60000);
+</script>
+</body>
+</html>
