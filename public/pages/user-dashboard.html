@@ -226,7 +226,7 @@ async function init() {
   loadCalendar();
   loadToday();
   loadMessages();
-  checkNotifStatus();
+  checkNotifStatus();  // Auto-prompt if not yet enabled
 }
 
 async function loadCalendar() {
@@ -322,46 +322,133 @@ function fmtTime(dt) {
 }
 
 // ── Push Notifications ────────────────────────────────────
-function checkNotifStatus() {
+// ── Notification Setup ───────────────────────────────────
+async function checkNotifStatus() {
+  const btn = document.getElementById('notifBtn');
+
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    btn.textContent = '🔔 Not Supported';
+    btn.disabled = true;
+    return;
+  }
+
+  if (Notification.permission === 'denied') {
+    btn.textContent = '🔕 Blocked';
+    btn.title = 'Notifications blocked. Please allow in browser settings.';
+    btn.style.opacity = '0.5';
+    return;
+  }
+
   if (Notification.permission === 'granted') {
-    notifEnabled = true;
-    const btn = document.getElementById('notifBtn');
-    btn.textContent = '🔔 Alerts On';
-    btn.classList.add('active');
+    // Permission already granted — make sure subscription is saved in DB
+    await registerAndSavePush();
+  } else {
+    // First time — show auto prompt after 2 seconds
+    setTimeout(() => showNotifBanner(), 2000);
   }
 }
 
+function showNotifBanner() {
+  // Don't show if already dismissed this session
+  if (sessionStorage.getItem('notifDismissed')) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'notifBanner';
+  banner.style.cssText = `
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:#1a2235; border:1px solid #3b82f6;
+    border-radius:14px; padding:16px 20px;
+    display:flex; align-items:center; gap:14px;
+    box-shadow:0 10px 40px rgba(0,0,0,0.5);
+    z-index:9999; max-width:420px; width:90%;
+    animation: slideUp 0.4s ease;
+  `;
+  banner.innerHTML = `
+    <style>@keyframes slideUp{from{transform:translateX(-50%) translateY(80px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}</style>
+    <div style="font-size:28px">🔔</div>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:14px;color:#f0f4ff;margin-bottom:2px">Enable Attendance Alerts</div>
+      <div style="font-size:12px;color:#8899bb">Get notified when you check in, check out, or receive messages from admin.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button onclick="handleEnableNotif()" style="padding:7px 14px;background:#3b82f6;border:none;border-radius:8px;color:white;font-weight:700;font-size:12px;cursor:pointer;">Enable</button>
+      <button onclick="dismissNotifBanner()" style="padding:7px 14px;background:transparent;border:1px solid #2a3a55;border-radius:8px;color:#8899bb;font-size:12px;cursor:pointer;">Later</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+}
+
+function dismissNotifBanner() {
+  sessionStorage.setItem('notifDismissed', '1');
+  const b = document.getElementById('notifBanner');
+  if (b) b.remove();
+}
+
+async function handleEnableNotif() {
+  dismissNotifBanner();
+  await toggleNotifications();
+}
+
 async function toggleNotifications() {
-  if (notifEnabled) return;
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    alert('Push notifications not supported in this browser');
+  if (notifEnabled) {
+    // Already on — show status
+    alert('✅ Notifications are already enabled for this device!');
     return;
   }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert('Push notifications are not supported in this browser.');
+    return;
+  }
+
   const perm = await Notification.requestPermission();
-  if (perm !== 'granted') { alert('Notification permission denied'); return; }
+  if (perm !== 'granted') {
+    alert('Notification permission denied. Please allow notifications in your browser settings and try again.');
+    return;
+  }
 
-  // Get VAPID key and subscribe
-  const keyRes = await fetch('/api/push/vapid-key');
-  const { publicKey } = await keyRes.json();
+  await registerAndSavePush();
+}
 
-  const reg = await navigator.serviceWorker.register('/sw.js');
-  await navigator.serviceWorker.ready;
+async function registerAndSavePush() {
+  try {
+    const keyRes = await fetch('/api/push/vapid-key');
+    const { publicKey } = await keyRes.json();
 
-  const sub = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(publicKey)
-  });
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
 
-  await fetch('/api/push/subscribe', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ subscription: sub })
-  });
+    // Check if already subscribed
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey)
+      });
+    }
 
-  notifEnabled = true;
-  const btn = document.getElementById('notifBtn');
-  btn.textContent = '🔔 Alerts On';
-  btn.classList.add('active');
+    // Always save to DB (in case DB was reset or user switched devices)
+    const saveRes = await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub })
+    });
+    const saveData = await saveRes.json();
+
+    if (saveData.success) {
+      notifEnabled = true;
+      const btn = document.getElementById('notifBtn');
+      btn.textContent = '🔔 Alerts On';
+      btn.classList.add('active');
+      // Show a test notification
+      new Notification('✅ RFID Attendance Alerts Enabled', {
+        body: 'You will now receive check-in, check-out and admin notifications.',
+        icon: '/icon-192.png'
+      });
+    }
+  } catch (err) {
+    console.error('Push registration error:', err);
+    alert('Failed to enable notifications: ' + err.message);
+  }
 }
 
 function urlBase64ToUint8Array(base64String) {
