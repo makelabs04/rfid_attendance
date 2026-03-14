@@ -131,6 +131,22 @@ router.get('/attendance/today-summary', adminAuth, async (req, res) => {
   }
 });
 
+// ── Helper: send push to a single user ─────────────────────
+async function sendPushToUser(userId, title, body, type) {
+  try {
+    const [rows] = await pool.execute('SELECT push_subscription FROM users WHERE id = ?', [userId]);
+    if (!rows.length || !rows[0].push_subscription) return;
+    const sub = JSON.parse(rows[0].push_subscription);
+    await webpush.sendNotification(sub, JSON.stringify({ title, body }));
+    await pool.execute(
+      'INSERT INTO notification_log (user_id, title, body, type) VALUES (?,?,?,?)',
+      [userId, title, body, type]
+    );
+  } catch (e) {
+    console.error('Push error (manual):', e.message);
+  }
+}
+
 // POST manual attendance (admin override)
 router.post('/attendance/manual', adminAuth, async (req, res) => {
   const { user_id, date, scan_type, scan_time, status, notes } = req.body;
@@ -139,8 +155,27 @@ router.post('/attendance/manual', adminAuth, async (req, res) => {
       'INSERT INTO attendance (user_id, rfid_tag, scan_type, scan_time, status, date, notes) VALUES (?,?,?,?,?,?,?)',
       [user_id, 'MANUAL', scan_type, scan_time, status, date, notes || 'Manual entry by admin']
     );
-    res.json({ success: true, message: 'Attendance recorded' });
+
+    // ── Send push notification to the employee ──────────────
+    const timeStr = scan_time ? new Date(scan_time).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'}) : '';
+    const statusLabels = {
+      present:     { title: '✅ Attendance Marked', body: `Your attendance has been marked as Present for ${date}.` },
+      late:        { title: '⚠️ Attendance Marked', body: `Your attendance has been marked as Late for ${date}.` },
+      absent:      { title: '❌ Attendance Marked', body: `Your attendance has been marked as Absent for ${date}.` },
+      early_leave: { title: '🏃 Attendance Marked', body: `Your attendance has been marked as Early Leave for ${date}.` },
+    };
+    const pushTypeMap = {
+      present: 'check_in', late: 'late_alert',
+      absent: 'absent_alert', early_leave: 'check_out'
+    };
+    const label = statusLabels[status] || { title: '📋 Attendance Updated', body: `Your attendance for ${date} has been updated by admin.` };
+    const pushType = pushTypeMap[status] || 'check_in';
+
+    await sendPushToUser(parseInt(user_id), label.title, label.body, pushType);
+
+    res.json({ success: true, message: 'Attendance recorded and employee notified' });
   } catch (err) {
+    console.error(err);
     res.json({ success: false, message: 'Error' });
   }
 });
