@@ -17,7 +17,7 @@ const DB = {
   connectionLimit: 10
 };
 const pool = mysql.createPool(DB);
-const JWT_SECRET    = 'rfid_super_secret_key_change_me';
+const JWT_SECRET    = '3200b5aa643fa458b7032d180c6ce909e675494bc42769e85af5ee0b038aa93b863ded77d44ad745ff6e4b9e690d8ce2df43cc3658e6d1af34d7c484624b79b9';
 const VAPID_PUBLIC  = 'BEjJfap-EDNq88uLNifPepC3M8bGnPHzq0IM9VYm82JYtlA3Ttqr6tTnxdANaKYYjUJPb6TfMCgyb79LqsORr3U';
 const VAPID_PRIVATE = 'BpvQkJM8UHFxtifQvEX_SiSQi3A2l0M0NPOglu-h7Tk';
 webpush.setVapidDetails('mailto:admin@company.com', VAPID_PUBLIC, VAPID_PRIVATE);
