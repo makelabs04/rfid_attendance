@@ -286,6 +286,33 @@
 </div>
 
 <!-- MODALS -->
+<!-- Add New Employee -->
+<div class="modal-overlay" id="addUserModal">
+  <div class="modal">
+    <h3>Add New Employee</h3>
+    <div class="form-row">
+      <div class="form-group"><label class="lbl">Full Name</label><input type="text" id="au-name" placeholder="John Doe"></div>
+      <div class="form-group"><label class="lbl">Mobile</label><input type="text" id="au-mobile" placeholder="9876543210"></div>
+    </div>
+    <div class="form-group"><label class="lbl">Email</label><input type="email" id="au-email" placeholder="john@company.com"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="lbl">Department</label><input type="text" id="au-dept" placeholder="Engineering"></div>
+      <div class="form-group"><label class="lbl">RFID Tag (optional)</label><input type="text" id="au-rfid" placeholder="e.g. A1B2C3D4"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="lbl">Password</label><input type="password" id="au-pass" placeholder="Min 8 characters"></div>
+      <div class="form-group"><label class="lbl">Role</label>
+        <select id="au-role"><option value="user">User</option><option value="admin">Admin</option></select>
+      </div>
+    </div>
+    <div id="addUserMsg" style="display:none;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:8px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addUserModal')">Cancel</button>
+      <button class="btn btn-primary" id="addUserBtn" onclick="submitAddUser()">Add Employee</button>
+    </div>
+  </div>
+</div>
+
 <!-- Edit User -->
 <div class="modal-overlay" id="editUserModal">
   <div class="modal">
@@ -435,7 +462,86 @@ function openEditUser(u) {
   document.getElementById('editUserModal').classList.add('open');
 }
 
-function openAddUser() { window.location.href='/register'; }
+function openAddUser() {
+  // Clear fields
+  ['au-name','au-mobile','au-email','au-dept','au-rfid','au-pass'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('au-role').value = 'user';
+  document.getElementById('addUserMsg').style.display = 'none';
+  document.getElementById('addUserBtn').disabled = false;
+  document.getElementById('addUserBtn').textContent = 'Add Employee';
+  document.getElementById('addUserModal').classList.add('open');
+}
+
+async function submitAddUser() {
+  const name  = document.getElementById('au-name').value.trim();
+  const mobile= document.getElementById('au-mobile').value.trim();
+  const email = document.getElementById('au-email').value.trim();
+  const dept  = document.getElementById('au-dept').value.trim();
+  const rfid  = document.getElementById('au-rfid').value.trim();
+  const pass  = document.getElementById('au-pass').value;
+  const role  = document.getElementById('au-role').value;
+  const msgEl = document.getElementById('addUserMsg');
+
+  if (!name || !mobile || !email || !dept || !pass) {
+    msgEl.style.cssText = 'display:block;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:8px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3)';
+    msgEl.textContent = 'All fields except RFID are required';
+    return;
+  }
+  if (pass.length < 8) {
+    msgEl.style.cssText = 'display:block;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:8px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3)';
+    msgEl.textContent = 'Password must be at least 8 characters';
+    return;
+  }
+
+  const btn = document.getElementById('addUserBtn');
+  btn.disabled = true; btn.textContent = 'Adding...';
+
+  try {
+    // Register user
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, mobile, email, department: dept, password: pass })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      // If RFID tag provided, assign it
+      if (rfid) {
+        // Get new user's ID first
+        const usersRes = await fetch('/api/admin/users');
+        const usersData = await usersRes.json();
+        const newUser = (usersData.users || []).find(u => u.email === email);
+        if (newUser) {
+          await fetch('/api/admin/users/' + newUser.id + '/rfid', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rfid_tag: rfid })
+          });
+          // If role is admin, update role too
+          if (role === 'admin') {
+            await fetch('/api/admin/users/' + newUser.id, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, email, mobile, department: dept, role: 'admin', is_active: 1 })
+            });
+          }
+        }
+      }
+      msgEl.style.cssText = 'display:block;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:8px;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3)';
+      msgEl.textContent = 'Employee added successfully!';
+      setTimeout(() => { closeModal('addUserModal'); loadUsers(); }, 1200);
+    } else {
+      msgEl.style.cssText = 'display:block;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:8px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3)';
+      msgEl.textContent = data.message || 'Error adding employee';
+      btn.disabled = false; btn.textContent = 'Add Employee';
+    }
+  } catch(e) {
+    msgEl.style.cssText = 'display:block;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:8px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3)';
+    msgEl.textContent = 'Network error. Please try again.';
+    btn.disabled = false; btn.textContent = 'Add Employee';
+  }
+}
 
 async function saveUser() {
   const id = document.getElementById('editUserId').value;
