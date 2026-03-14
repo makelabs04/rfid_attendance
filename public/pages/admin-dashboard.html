@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — RFID Attendance</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#080d1a; --surface:#0e1624; --card:#141e30; --border:#1e2e48;
+    --accent:#3b82f6; --accent2:#06b6d4; --green:#10b981; --red:#ef4444;
+    --yellow:#f59e0b; --purple:#8b5cf6; --orange:#f97316;
+    --text:#e8f0ff; --muted:#6b80a0; --radius:12px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'Space Grotesk',sans-serif; min-height:100vh; display:flex; }
+
+  /* SIDEBAR */
+  .sidebar { width:220px; background:var(--surface); border-right:1px solid var(--border); padding:20px 0; display:flex; flex-direction:column; flex-shrink:0; }
+  .sidebar-logo { padding:0 20px 20px; border-bottom:1px solid var(--border); margin-bottom:8px; }
+  .sidebar-logo .logo-icon { width:40px; height:40px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:20px; margin-bottom:8px; }
+  .sidebar-logo .logo-text { font-family:'Syne',sans-serif; font-size:14px; font-weight:800; }
+  .sidebar-logo .logo-sub { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+
+  .nav-item { display:flex; align-items:center; gap:10px; padding:10px 20px; color:var(--muted); font-size:13px; font-weight:500; cursor:pointer; transition:all 0.15s; border-left:3px solid transparent; }
+  .nav-item:hover { color:var(--text); background:rgba(59,130,246,0.05); }
+  .nav-item.active { color:var(--text); background:rgba(59,130,246,0.1); border-left-color:var(--accent); }
+  .nav-item .nav-icon { font-size:16px; }
+  .nav-section { padding:14px 20px 6px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--muted); }
+
+  .sidebar-footer { margin-top:auto; padding:16px 20px; border-top:1px solid var(--border); }
+  .logout-btn { width:100%; padding:8px; background:transparent; border:1px solid var(--border); color:var(--muted); border-radius:8px; font-family:inherit; font-size:12px; cursor:pointer; transition:all 0.2s; }
+  .logout-btn:hover { border-color:var(--red); color:var(--red); }
+
+  /* MAIN CONTENT */
+  .content { flex:1; overflow:auto; }
+  .topbar { background:var(--card); border-bottom:1px solid var(--border); padding:0 24px; height:56px; display:flex; align-items:center; justify-content:space-between; }
+  .topbar h2 { font-family:'Syne',sans-serif; font-size:18px; font-weight:800; }
+  .page { padding:24px; display:none; }
+  .page.active { display:block; }
+
+  /* STATS */
+  .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:24px; }
+  .stat-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; }
+  .stat-card .lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); margin-bottom:8px; }
+  .stat-card .val { font-family:'Syne',sans-serif; font-size:30px; font-weight:800; }
+
+  /* TABLE */
+  .table-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .table-header { padding:16px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); }
+  .table-header h3 { font-size:14px; font-weight:700; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; padding:10px 16px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); background:var(--surface); border-bottom:1px solid var(--border); }
+  td { padding:11px 16px; font-size:13px; border-bottom:1px solid var(--border); }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:rgba(59,130,246,0.03); }
+
+  /* BADGES */
+  .badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+  .badge.present    { background:rgba(16,185,129,0.15); color:var(--green); }
+  .badge.late       { background:rgba(245,158,11,0.15); color:var(--yellow); }
+  .badge.absent     { background:rgba(239,68,68,0.15);  color:var(--red); }
+  .badge.early_leave{ background:rgba(139,92,246,0.15); color:var(--purple); }
+  .badge.admin      { background:rgba(249,115,22,0.15); color:var(--orange); }
+  .badge.user       { background:rgba(59,130,246,0.15); color:var(--accent); }
+
+  /* BUTTONS */
+  .btn { padding:8px 16px; border-radius:8px; border:none; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s; }
+  .btn-primary { background:var(--accent); color:white; }
+  .btn-primary:hover { background:#2563eb; }
+  .btn-danger { background:rgba(239,68,68,0.15); color:var(--red); border:1px solid rgba(239,68,68,0.3); }
+  .btn-danger:hover { background:rgba(239,68,68,0.25); }
+  .btn-sm { padding:5px 10px; font-size:11px; }
+  .btn-ghost { background:transparent; border:1px solid var(--border); color:var(--muted); }
+  .btn-ghost:hover { border-color:var(--accent); color:var(--text); }
+
+  /* FORM ELEMENTS */
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .form-group { margin-bottom:14px; }
+  label.lbl { display:block; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.7px; color:var(--muted); margin-bottom:6px; }
+  input, select, textarea { width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:13px; outline:none; transition:border-color 0.2s; }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+  textarea { resize:vertical; min-height:80px; }
+  select option { background:var(--surface); }
+
+  /* MODAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:28px; width:100%; max-width:480px; }
+  .modal h3 { font-family:'Syne',sans-serif; font-size:16px; font-weight:800; margin-bottom:18px; }
+  .modal-footer { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+
+  /* FILTERS */
+  .filters { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .filters input, .filters select { width:auto; }
+
+  /* TOAST */
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--card); border:1px solid var(--border); padding:12px 18px; border-radius:10px; font-size:13px; z-index:1000; display:none; box-shadow:0 10px 30px rgba(0,0,0,0.4); }
+  .toast.show { display:block; animation:slideIn 0.3s ease; }
+  .toast.success { border-left:3px solid var(--green); }
+  .toast.error   { border-left:3px solid var(--red); }
+  @keyframes slideIn { from{transform:translateX(60px);opacity:0} to{transform:translateX(0);opacity:1} }
+
+  .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .search-box { padding:8px 12px; background:var(--surface); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:13px; outline:none; width:200px; }
+  .search-box:focus { border-color:var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📡</div>
+    <div class="logo-text">RFID Admin</div>
+    <div class="logo-sub">Control Panel</div>
+  </div>
+  <div class="nav-section">Overview</div>
+  <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">📊</span>Dashboard</div>
+  <div class="nav-section">Management</div>
+  <div class="nav-item" onclick="showPage('users')"><span class="nav-icon">👥</span>Employees</div>
+  <div class="nav-item" onclick="showPage('attendance')"><span class="nav-icon">📋</span>Attendance</div>
+  <div class="nav-item" onclick="showPage('messages')"><span class="nav-icon">💬</span>Messages</div>
+  <div class="nav-section">Config</div>
+  <div class="nav-item" onclick="showPage('settings')"><span class="nav-icon">⚙️</span>Office Settings</div>
+  <div class="sidebar-footer">
+    <button class="logout-btn" onclick="logout()">← Sign Out</button>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+  <div class="topbar">
+    <h2 id="pageTitle">Dashboard</h2>
+    <div id="topbarActions"></div>
+  </div>
+
+  <!-- ── DASHBOARD ── -->
+  <div class="page active" id="page-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="lbl">Total Employees</div><div class="val" id="d-total" style="color:var(--accent)">—</div></div>
+      <div class="stat-card"><div class="lbl">Present Today</div><div class="val" id="d-present" style="color:var(--green)">—</div></div>
+      <div class="stat-card"><div class="lbl">Late Today</div><div class="val" id="d-late" style="color:var(--yellow)">—</div></div>
+      <div class="stat-card"><div class="lbl">Absent Today</div><div class="val" id="d-absent" style="color:var(--red)">—</div></div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <h3>Today's Attendance — <span id="todayDate"></span></h3>
+        <button class="btn btn-primary btn-sm" onclick="loadTodaySummary()">↻ Refresh</button>
+      </div>
+      <table>
+        <thead><tr><th>Employee</th><th>Department</th><th>Check In</th><th>Check Out</th><th>Status</th><th>Hours</th></tr></thead>
+        <tbody id="todayTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── USERS ── -->
+  <div class="page" id="page-users">
+    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center">
+      <input class="search-box" id="userSearch" placeholder="Search employees..." oninput="filterUsers()">
+      <button class="btn btn-primary btn-sm" onclick="openAddUser()">+ Add Employee</button>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Department</th><th>RFID Tag</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="usersTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── ATTENDANCE ── -->
+  <div class="page" id="page-attendance">
+    <div class="filters" style="margin-bottom:16px;">
+      <input type="date" id="attDate" style="width:160px">
+      <input type="month" id="attMonth" style="width:150px">
+      <select id="attDept" style="width:160px"><option value="">All Departments</option></select>
+      <button class="btn btn-primary btn-sm" onclick="loadAttendance()">Filter</button>
+      <button class="btn btn-ghost btn-sm" onclick="openManualAttendance()">+ Manual Entry</button>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead><tr><th>Date</th><th>Employee</th><th>Department</th><th>Check In</th><th>Check Out</th><th>Status</th><th>Hours</th><th>Actions</th></tr></thead>
+        <tbody id="attTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── MESSAGES ── -->
+  <div class="page" id="page-messages">
+    <div style="display:grid;grid-template-columns:1fr 380px;gap:20px">
+      <div>
+        <div class="table-card">
+          <div class="table-header"><h3>Sent Messages</h3></div>
+          <table>
+            <thead><tr><th>Subject</th><th>Recipient</th><th>Sent At</th><th>Actions</th></tr></thead>
+            <tbody id="msgTable"></tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div class="table-card" style="padding:20px">
+          <h3 style="font-size:14px;font-weight:700;margin-bottom:16px">Send Message / Notification</h3>
+          <div class="form-group">
+            <label class="lbl">Recipient Type</label>
+            <select id="msgRecipient" onchange="updateMsgFields()">
+              <option value="all">All Employees</option>
+              <option value="department">By Department</option>
+              <option value="individual">Individual</option>
+            </select>
+          </div>
+          <div class="form-group" id="msgDeptField" style="display:none">
+            <label class="lbl">Department</label>
+            <select id="msgDept"></select>
+          </div>
+          <div class="form-group" id="msgUserField" style="display:none">
+            <label class="lbl">Employee</label>
+            <select id="msgUser"></select>
+          </div>
+          <div class="form-group">
+            <label class="lbl">Filter by Status (optional)</label>
+            <select id="msgStatus">
+              <option value="all">All</option>
+              <option value="present">Present</option>
+              <option value="late">Late</option>
+              <option value="absent">Absent</option>
+              <option value="early_leave">Early Leave</option>
+            </select>
+          </div>
+          <div class="form-group" id="msgDateField" style="display:none">
+            <label class="lbl">For Date</label>
+            <input type="date" id="msgDate">
+          </div>
+          <div class="form-group">
+            <label class="lbl">Subject</label>
+            <input type="text" id="msgSubject" placeholder="Attendance reminder...">
+          </div>
+          <div class="form-group">
+            <label class="lbl">Message</label>
+            <textarea id="msgBody" placeholder="Your message here..."></textarea>
+          </div>
+          <button class="btn btn-primary" style="width:100%" onclick="sendMessage()">Send + Notify →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SETTINGS ── -->
+  <div class="page" id="page-settings">
+    <div class="table-card" style="padding:24px;max-width:560px">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:20px">Office Settings</h3>
+      <div class="settings-grid">
+        <div class="form-group">
+          <label class="lbl">Office Name</label>
+          <input type="text" id="s-office-name" placeholder="My Company">
+        </div>
+        <div class="form-group">
+          <label class="lbl">Timezone</label>
+          <select id="s-timezone">
+            <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+            <option value="America/New_York">America/New_York (EST)</option>
+            <option value="Europe/London">Europe/London (GMT)</option>
+            <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="lbl">Office Start Time</label>
+          <input type="time" id="s-office-start">
+        </div>
+        <div class="form-group">
+          <label class="lbl">Office End Time</label>
+          <input type="time" id="s-office-end">
+        </div>
+        <div class="form-group">
+          <label class="lbl">Late Threshold (minutes)</label>
+          <input type="number" id="s-late-threshold" placeholder="15">
+        </div>
+        <div class="form-group">
+          <label class="lbl">Early Leave Threshold (min)</label>
+          <input type="number" id="s-early-leave" placeholder="30">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<!-- Edit User -->
+<div class="modal-overlay" id="editUserModal">
+  <div class="modal">
+    <h3 id="editUserTitle">Edit Employee</h3>
+    <input type="hidden" id="editUserId">
+    <div class="form-row">
+      <div class="form-group"><label class="lbl">Name</label><input type="text" id="eu-name"></div>
+      <div class="form-group"><label class="lbl">Mobile</label><input type="text" id="eu-mobile"></div>
+    </div>
+    <div class="form-group"><label class="lbl">Email</label><input type="email" id="eu-email"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="lbl">Department</label><input type="text" id="eu-dept"></div>
+      <div class="form-group"><label class="lbl">RFID Tag</label><input type="text" id="eu-rfid" placeholder="e.g. A1B2C3D4"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="lbl">Role</label>
+        <select id="eu-role"><option value="user">User</option><option value="admin">Admin</option></select>
+      </div>
+      <div class="form-group"><label class="lbl">Status</label>
+        <select id="eu-active"><option value="1">Active</option><option value="0">Inactive</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('editUserModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Attendance -->
+<div class="modal-overlay" id="manualAttModal">
+  <div class="modal">
+    <h3>Manual Attendance Entry</h3>
+    <div class="form-group"><label class="lbl">Employee</label><select id="ma-user"></select></div>
+    <div class="form-row">
+      <div class="form-group"><label class="lbl">Date</label><input type="date" id="ma-date"></div>
+      <div class="form-group"><label class="lbl">Scan Type</label>
+        <select id="ma-type"><option value="check_in">Check In</option><option value="check_out">Check Out</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="lbl">Time</label><input type="time" id="ma-time"></div>
+      <div class="form-group"><label class="lbl">Status</label>
+        <select id="ma-status"><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option><option value="early_leave">Early Leave</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label class="lbl">Notes</label><textarea id="ma-notes" placeholder="Reason for manual entry..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('manualAttModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveManualAtt()">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+let allUsers = [];
+
+// ── Auth + Init ───────────────────────────────────────────
+async function init() {
+  const res = await fetch('/api/auth/me');
+  const data = await res.json();
+  if (!data.loggedIn || data.user.role !== 'admin') { window.location.href='/'; return; }
+  loadTodaySummary();
+  loadUsers();
+  loadDepts();
+}
+
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  document.querySelector(`[onclick="showPage('${page}')"]`).classList.add('active');
+  const titles = { dashboard:'Dashboard', users:'Employees', attendance:'Attendance Records', messages:'Messages & Notifications', settings:'Office Settings' };
+  document.getElementById('pageTitle').textContent = titles[page] || page;
+  if (page === 'attendance') loadAttendance();
+  if (page === 'messages')   { loadMessages(); loadMsgUsers(); }
+  if (page === 'settings')   loadSettings();
+}
+
+// ── Dashboard ─────────────────────────────────────────────
+async function loadTodaySummary() {
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-IN',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
+  const res = await fetch('/api/admin/attendance/today-summary');
+  const data = await res.json();
+  if (!data.success) return;
+  const r = data.records;
+  document.getElementById('d-total').textContent   = r.length;
+  document.getElementById('d-present').textContent = r.filter(x=>x.status==='present'||x.status==='late').length;
+  document.getElementById('d-late').textContent    = r.filter(x=>x.status==='late').length;
+  document.getElementById('d-absent').textContent  = r.filter(x=>x.status==='absent').length;
+  document.getElementById('todayTable').innerHTML  = r.map(u => `
+    <tr>
+      <td><strong>${u.name}</strong></td>
+      <td>${u.department}</td>
+      <td>${u.check_in ? fmtTime(u.check_in) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td>${u.check_out ? fmtTime(u.check_out) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td><span class="badge ${u.status}">${u.status}</span></td>
+      <td>${u.working_hours ? u.working_hours+'h' : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Users ─────────────────────────────────────────────────
+async function loadUsers() {
+  const res = await fetch('/api/admin/users');
+  const data = await res.json();
+  allUsers = data.users || [];
+  renderUsers(allUsers);
+}
+
+function renderUsers(users) {
+  document.getElementById('usersTable').innerHTML = users.map(u => `
+    <tr>
+      <td><strong>${u.name}</strong></td>
+      <td>${u.email}</td>
+      <td>${u.mobile}</td>
+      <td>${u.department}</td>
+      <td>${u.rfid_tag ? `<code style="background:var(--surface);padding:2px 6px;border-radius:5px;font-size:11px">${u.rfid_tag}</code>` : '<span style="color:var(--muted)">Not assigned</span>'}</td>
+      <td><span class="badge ${u.role}">${u.role}</span></td>
+      <td><span style="color:${u.is_active?'var(--green)':'var(--red)'}">${u.is_active?'Active':'Inactive'}</span></td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openEditUser(${JSON.stringify(u).replace(/"/g,'&quot;')})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${u.name}')">Del</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterUsers() {
+  const q = document.getElementById('userSearch').value.toLowerCase();
+  renderUsers(allUsers.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.department.toLowerCase().includes(q)));
+}
+
+function openEditUser(u) {
+  document.getElementById('editUserId').value  = u.id;
+  document.getElementById('eu-name').value     = u.name;
+  document.getElementById('eu-email').value    = u.email;
+  document.getElementById('eu-mobile').value   = u.mobile;
+  document.getElementById('eu-dept').value     = u.department;
+  document.getElementById('eu-rfid').value     = u.rfid_tag || '';
+  document.getElementById('eu-role').value     = u.role;
+  document.getElementById('eu-active').value   = u.is_active;
+  document.getElementById('editUserTitle').textContent = `Edit: ${u.name}`;
+  document.getElementById('editUserModal').classList.add('open');
+}
+
+function openAddUser() { window.location.href='/register'; }
+
+async function saveUser() {
+  const id = document.getElementById('editUserId').value;
+  const body = {
+    name:      document.getElementById('eu-name').value,
+    email:     document.getElementById('eu-email').value,
+    mobile:    document.getElementById('eu-mobile').value,
+    department:document.getElementById('eu-dept').value,
+    role:      document.getElementById('eu-role').value,
+    is_active: document.getElementById('eu-active').value
+  };
+  const rfid = document.getElementById('eu-rfid').value.trim();
+
+  const res = await fetch(`/api/admin/users/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  const data = await res.json();
+
+  if (rfid) {
+    await fetch(`/api/admin/users/${id}/rfid`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({rfid_tag:rfid}) });
+  }
+  toast(data.success ? 'success':'error', data.message);
+  if (data.success) { closeModal('editUserModal'); loadUsers(); }
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`Delete employee "${name}"? This cannot be undone.`)) return;
+  const res = await fetch(`/api/admin/users/${id}`, {method:'DELETE'});
+  const data = await res.json();
+  toast(data.success?'success':'error', data.message);
+  if (data.success) loadUsers();
+}
+
+// ── Attendance ────────────────────────────────────────────
+async function loadAttendance() {
+  const date  = document.getElementById('attDate').value;
+  const month = document.getElementById('attMonth').value;
+  const dept  = document.getElementById('attDept').value;
+  const params = new URLSearchParams();
+  if (date)  params.set('date', date);
+  if (month) params.set('month', month);
+  if (dept)  params.set('department', dept);
+
+  const res = await fetch(`/api/admin/attendance?${params}`);
+  const data = await res.json();
+  document.getElementById('attTable').innerHTML = (data.records || []).map(r => `
+    <tr>
+      <td>${r.date?.slice?.(0,10) || r.date}</td>
+      <td><strong>${r.name}</strong></td>
+      <td>${r.department}</td>
+      <td>${r.scan_type==='check_in' ? fmtTime(r.scan_time) : '—'}</td>
+      <td>${r.scan_type==='check_out' ? fmtTime(r.scan_time) : '—'}</td>
+      <td><span class="badge ${r.status}">${r.status}</span></td>
+      <td>${r.working_hours ? r.working_hours+'h':'—'}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteAtt(${r.id})">Del</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">No records</td></tr>';
+}
+
+function openManualAttendance() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('ma-date').value = today;
+  document.getElementById('ma-time').value = new Date().toTimeString().slice(0,5);
+  // Populate user select
+  document.getElementById('ma-user').innerHTML = allUsers.filter(u=>u.role==='user').map(u => `<option value="${u.id}">${u.name} (${u.department})</option>`).join('');
+  document.getElementById('manualAttModal').classList.add('open');
+}
+
+async function saveManualAtt() {
+  const userId = document.getElementById('ma-user').value;
+  const date   = document.getElementById('ma-date').value;
+  const type   = document.getElementById('ma-type').value;
+  const time   = document.getElementById('ma-time').value;
+  const status = document.getElementById('ma-status').value;
+  const notes  = document.getElementById('ma-notes').value;
+  if (!userId||!date||!time) return toast('error','Fill all required fields');
+  const res = await fetch('/api/admin/attendance/manual', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ user_id:userId, date, scan_type:type, scan_time:`${date}T${time}:00`, status, notes })
+  });
+  const data = await res.json();
+  toast(data.success?'success':'error', data.message);
+  if (data.success) { closeModal('manualAttModal'); loadAttendance(); }
+}
+
+async function deleteAtt(id) {
+  if (!confirm('Delete this attendance record?')) return;
+  const res = await fetch(`/api/admin/attendance/${id}`, {method:'DELETE'});
+  const data = await res.json();
+  toast(data.success?'success':'error', data.message);
+  if (data.success) loadAttendance();
+}
+
+// ── Messages ──────────────────────────────────────────────
+async function loadMessages() {
+  const res = await fetch('/api/admin/messages');
+  const data = await res.json();
+  document.getElementById('msgTable').innerHTML = (data.messages||[]).map(m => `
+    <tr>
+      <td><strong>${m.subject}</strong></td>
+      <td>${m.recipient_type==='individual'?'Individual':m.recipient_type==='department'?m.department:'All'}</td>
+      <td>${new Date(m.sent_at).toLocaleString()}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteMsg(${m.id})">Del</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">No messages</td></tr>';
+}
+
+async function loadMsgUsers() {
+  const res = await fetch('/api/admin/users');
+  const data = await res.json();
+  document.getElementById('msgUser').innerHTML = (data.users||[]).filter(u=>u.role==='user').map(u=>`<option value="${u.id}">${u.name} — ${u.department}</option>`).join('');
+}
+
+function updateMsgFields() {
+  const v = document.getElementById('msgRecipient').value;
+  document.getElementById('msgDeptField').style.display = v==='department'?'block':'none';
+  document.getElementById('msgUserField').style.display = v==='individual'?'block':'none';
+}
+
+document.getElementById('msgStatus')?.addEventListener('change', function() {
+  document.getElementById('msgDateField').style.display = this.value!=='all'?'block':'none';
+});
+
+async function sendMessage() {
+  const recipientType = document.getElementById('msgRecipient').value;
+  const subject = document.getElementById('msgSubject').value.trim();
+  const body    = document.getElementById('msgBody').value.trim();
+  if (!subject || !body) return toast('error','Subject and message are required');
+  const payload = {
+    recipient_type: recipientType,
+    subject, body,
+    status_filter: document.getElementById('msgStatus').value,
+    date: document.getElementById('msgDate').value
+  };
+  if (recipientType==='department') payload.department = document.getElementById('msgDept').value;
+  if (recipientType==='individual') payload.user_id = document.getElementById('msgUser').value;
+  const res = await fetch('/api/admin/messages', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+  const data = await res.json();
+  toast(data.success?'success':'error', data.message);
+  if (data.success) { document.getElementById('msgSubject').value=''; document.getElementById('msgBody').value=''; loadMessages(); }
+}
+
+async function deleteMsg(id) {
+  if (!confirm('Delete this message?')) return;
+  const res = await fetch(`/api/admin/messages/${id}`,{method:'DELETE'});
+  const data = await res.json();
+  toast(data.success?'success':'error',data.message);
+  if (data.success) loadMessages();
+}
+
+// ── Settings ──────────────────────────────────────────────
+async function loadSettings() {
+  const res = await fetch('/api/admin/settings');
+  const data = await res.json();
+  if (!data.success) return;
+  const s = data.settings;
+  document.getElementById('s-office-name').value  = s.office_name    || '';
+  document.getElementById('s-office-start').value = s.office_start   || '09:00';
+  document.getElementById('s-office-end').value   = s.office_end     || '18:00';
+  document.getElementById('s-late-threshold').value  = s.late_threshold_minutes || '15';
+  document.getElementById('s-early-leave').value  = s.early_leave_threshold_minutes || '30';
+  document.getElementById('s-timezone').value     = s.timezone || 'Asia/Kolkata';
+}
+
+async function saveSettings() {
+  const payload = {
+    office_name: document.getElementById('s-office-name').value,
+    office_start: document.getElementById('s-office-start').value,
+    office_end: document.getElementById('s-office-end').value,
+    late_threshold_minutes: document.getElementById('s-late-threshold').value,
+    early_leave_threshold_minutes: document.getElementById('s-early-leave').value,
+    timezone: document.getElementById('s-timezone').value
+  };
+  const res = await fetch('/api/admin/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const data = await res.json();
+  toast(data.success?'success':'error', data.message);
+}
+
+// ── Departments ───────────────────────────────────────────
+async function loadDepts() {
+  const res = await fetch('/api/admin/departments');
+  const data = await res.json();
+  const opts = ['<option value="">All Departments</option>',
+    ...(data.departments||[]).map(d=>`<option value="${d}">${d}</option>`)].join('');
+  document.getElementById('attDept').innerHTML = opts;
+  document.getElementById('msgDept').innerHTML = (data.departments||[]).map(d=>`<option value="${d}">${d}</option>`).join('');
+}
+
+// ── Helpers ───────────────────────────────────────────────
+function fmtTime(dt) { return new Date(dt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function toast(type, msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast ${type} show`;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+async function logout() {
+  await fetch('/api/auth/logout',{method:'POST'});
+  window.location.href='/';
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+
+init();
+setInterval(loadTodaySummary, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RFID Attendance — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0f1e;
+    --surface: #111827;
+    --card: #1a2235;
+    --border: #2a3a55;
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #f0f4ff;
+    --muted: #8899bb;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .bg-grid {
+    position: fixed; inset: 0; pointer-events: none;
+    background-image: linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+  .bg-glow {
+    position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
+    width: 600px; height: 400px;
+    background: radial-gradient(ellipse, rgba(59,130,246,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .container {
+    width: 100%; max-width: 440px; padding: 20px;
+    position: relative; z-index: 1;
+  }
+  .logo {
+    text-align: center; margin-bottom: 32px;
+  }
+  .logo-icon {
+    width: 56px; height: 56px; margin: 0 auto 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; box-shadow: 0 0 40px rgba(59,130,246,0.4);
+  }
+  .logo h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px; font-weight: 800; letter-spacing: -0.5px;
+  }
+  .logo p { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+  }
+  .tabs {
+    display: flex; gap: 4px;
+    background: var(--surface);
+    padding: 4px; border-radius: 10px;
+    margin-bottom: 28px;
+  }
+  .tab {
+    flex: 1; padding: 9px;
+    border: none; background: transparent;
+    color: var(--muted); font-family: inherit;
+    font-size: 14px; font-weight: 600;
+    border-radius: 8px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab.active {
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.4);
+  }
+  .form { display: none; }
+  .form.active { display: block; }
+
+  .form-group { margin-bottom: 16px; }
+  label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.8px; margin-bottom: 6px;
+  }
+  input, select {
+    width: 100%; padding: 11px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    color: var(--text); font-family: inherit; font-size: 14px;
+    outline: none; transition: border-color 0.2s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  select option { background: var(--surface); }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .btn {
+    width: 100%; padding: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; border-radius: 10px;
+    color: white; font-family: inherit; font-size: 15px;
+    font-weight: 700; cursor: pointer; letter-spacing: 0.3px;
+    transition: opacity 0.2s, transform 0.1s;
+    margin-top: 4px;
+  }
+  .btn:hover { opacity: 0.9; }
+  .btn:active { transform: scale(0.99); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .msg {
+    padding: 11px 14px; border-radius: 9px;
+    font-size: 13px; font-weight: 500; margin-bottom: 16px;
+    display: none;
+  }
+  .msg.success { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+  .msg.error   { background: rgba(239,68,68,0.15);  color: var(--red);   border: 1px solid rgba(239,68,68,0.3);  }
+
+  .divider {
+    text-align: center; color: var(--muted);
+    font-size: 12px; margin: 16px 0;
+    position: relative;
+  }
+  .divider::before, .divider::after {
+    content: ''; position: absolute; top: 50%;
+    width: 42%; height: 1px; background: var(--border);
+  }
+  .divider::before { left: 0; }
+  .divider::after  { right: 0; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(16,185,129,0.12);
+    color: var(--green); border: 1px solid rgba(16,185,129,0.25);
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge::before { content: '●'; font-size: 8px; }
+  .footer-badges {
+    display: flex; justify-content: center; gap: 8px;
+    margin-top: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+
+<div class="container">
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    <h1>RFID Attendance</h1>
+    <p>Smart attendance management system</p>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('login')">Sign In</button>
+      <button class="tab" onclick="switchTab('register')">Register</button>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <div class="form active" id="loginForm">
+      <div id="loginMsg" class="msg"></div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="loginEmail" placeholder="you@company.com">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPass" placeholder="••••••••">
+      </div>
+      <button class="btn" onclick="doLogin()">Sign In →</button>
+    </div>
+
+    <!-- REGISTER FORM -->
+    <div class="form" id="registerForm">
+      <div id="regMsg" class="msg"></div>
+      <div class="row2">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="regName" placeholder="John Doe">
+        </div>
+        <div class="form-group">
+          <label>Mobile</label>
+          <input type="text" id="regMobile" placeholder="9876543210">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="regEmail" placeholder="you@company.com">
+      </div>
+      <div class="form-group">
+        <label>Department</label>
+        <select id="regDept">
+          <option value="">Select Department</option>
+          <option>Engineering</option>
+          <option>Design</option>
+          <option>Marketing</option>
+          <option>Sales</option>
+          <option>HR</option>
+          <option>Finance</option>
+          <option>Operations</option>
+          <option>Administration</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="regPass" placeholder="Min 8 characters">
+      </div>
+      <button class="btn" onclick="doRegister()">Create Account →</button>
+    </div>
+  </div>
+
+  <div class="footer-badges">
+    <span class="badge">RFID Enabled</span>
+    <span class="badge">Push Alerts</span>
+    <span class="badge">Real-time</span>
+  </div>
+</div>
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+  document.getElementById('loginForm').classList.toggle('active', tab==='login');
+  document.getElementById('registerForm').classList.toggle('active', tab==='register');
+}
+
+function showMsg(id, type, text) {
+  const el = document.getElementById(id);
+  el.className = `msg ${type}`;
+  el.textContent = text;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 5000);
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPass').value;
+  if (!email || !password) return showMsg('loginMsg','error','Please fill all fields');
+  const btn = document.querySelector('#loginForm .btn');
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  try {
+    const res = await fetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if (data.success) {
+      showMsg('loginMsg','success',`Welcome back, ${data.name}!`);
+      setTimeout(() => window.location.href = data.role === 'admin' ? '/admin' : '/dashboard', 800);
+    } else {
+      showMsg('loginMsg','error', data.message);
+      btn.disabled = false; btn.textContent = 'Sign In →';
+    }
+  } catch { showMsg('loginMsg','error','Network error'); btn.disabled=false; btn.textContent='Sign In →'; }
+}
+
+async function doRegister() {
+  const name = document.getElementById('regName').value.trim();
+  const mobile = document.getElementById('regMobile').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const department = document.getElementById('regDept').value;
+  const password = document.getElementById('regPass').value;
+  if (!name||!mobile||!email||!department||!password) return showMsg('regMsg','error','All fields required');
+  if (password.length < 8) return showMsg('regMsg','error','Password must be 8+ characters');
+  const btn = document.querySelector('#registerForm .btn');
+  btn.disabled=true; btn.textContent='Registering...';
+  try {
+    const res = await fetch('/api/auth/register', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name,mobile,email,department,password})
+    });
+    const data = await res.json();
+    if (data.success) {
+      showMsg('regMsg','success', data.message);
+      setTimeout(() => switchTab('login'), 2000);
+    } else showMsg('regMsg','error', data.message);
+    btn.disabled=false; btn.textContent='Create Account →';
+  } catch { showMsg('regMsg','error','Network error'); btn.disabled=false; btn.textContent='Create Account →'; }
+}
+
+document.addEventListener('keydown', e => { if(e.key==='Enter') { if(document.getElementById('loginForm').classList.contains('active')) doLogin(); else doRegister(); }});
+</script>
+</body>
+</html>
